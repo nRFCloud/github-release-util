@@ -66,15 +66,12 @@ const doRelease = async ({
 	owner,
 	repo,
 	buildDir,
+	shouldUploadBuildAssets,
 }: Config): Promise<void> => {
 	try {
 		const client = new Octokit({
 			auth: gitHubToken,
 		});
-
-		log(`Zipping...`);
-		const file: FileDetails = await zipFile(buildDir, targetTag, isBeta);
-		log('DONE!', LogType.info);
 
 		log(`\n\nCreating release...`);
 		const release = await client.repos.createRelease({
@@ -87,28 +84,34 @@ const doRelease = async ({
 			});
 		log('DONE!\n\n', LogType.info);
 
-		log('Uploading...');
-		await client.repos.uploadReleaseAsset({
-			url: release.data.upload_url,
-			headers: file.headers,
-			file: file.buffer,
-			name: file.name,
-		});
-		log(`DONE! \n\n`, LogType.info);
+		if (shouldUploadBuildAssets) {
+			log(`Zipping...`);
+			const file: FileDetails = await zipFile(buildDir, targetTag, isBeta);
+			log('DONE!', LogType.info);
 
-		const { doDelete } = await inquirer.prompt([{
-			name: 'doDelete',
-			message: `Delete build assets "${file.name}"?`,
-			default: true,
-			type: 'confirm',
-		}]);
-		
-		if (doDelete === true) {
-			const fileToDelete = `${process.cwd()}${path.sep}${file.name}`;
+			log('Uploading...');
+			await client.repos.uploadReleaseAsset({
+				url: release.data.upload_url,
+				headers: file.headers,
+				file: file.buffer,
+				name: file.name,
+			});
+			log(`DONE! \n\n`, LogType.info);
 
-			log('\n\nDeleting...');
-			fs.unlinkSync(fileToDelete);
-			log('DONE! \n\n', LogType.info);
+			const { doDelete } = await inquirer.prompt([{
+				name: 'doDelete',
+				message: `Delete build assets "${file.name}"?`,
+				default: true,
+				type: 'confirm',
+			}]);
+			
+			if (doDelete === true) {
+				const fileToDelete = `${process.cwd()}${path.sep}${file.name}`;
+
+				log('\n\nDeleting...');
+				fs.unlinkSync(fileToDelete);
+				log('DONE! \n\n', LogType.info);
+			}
 		}
 	} catch (err) {
 		log(`Error with release: "${err}"`, LogType.error);
