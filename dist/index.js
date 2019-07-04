@@ -30,14 +30,11 @@ const log = (msg, type = LogType.log) => {
     }
     doRelease(config);
 })();
-const doRelease = async ({ targetTag, gitHubToken, isBeta, releaseMessage, releaseName, owner, repo, buildDir, }) => {
+const doRelease = async ({ targetTag, gitHubToken, isBeta, releaseMessage, releaseName, owner, repo, buildDir, shouldUploadBuildAssets, }) => {
     try {
         const client = new Octokit({
             auth: gitHubToken,
         });
-        log(`Zipping...`);
-        const file = await zipFile(buildDir, targetTag, isBeta);
-        log('DONE!', LogType.info);
         log(`\n\nCreating release...`);
         const release = await client.repos.createRelease({
             owner,
@@ -48,25 +45,30 @@ const doRelease = async ({ targetTag, gitHubToken, isBeta, releaseMessage, relea
             prerelease: isBeta,
         });
         log('DONE!\n\n', LogType.info);
-        log('Uploading...');
-        await client.repos.uploadReleaseAsset({
-            url: release.data.upload_url,
-            headers: file.headers,
-            file: file.buffer,
-            name: file.name,
-        });
-        log(`DONE! \n\n`, LogType.info);
-        const { doDelete } = await inquirer.prompt([{
-                name: 'doDelete',
-                message: `Delete build assets "${file.name}"?`,
-                default: true,
-                type: 'confirm',
-            }]);
-        if (doDelete === true) {
-            const fileToDelete = `${process.cwd()}${path.sep}${file.name}`;
-            log('\n\nDeleting...');
-            fs.unlinkSync(fileToDelete);
-            log('DONE! \n\n', LogType.info);
+        if (shouldUploadBuildAssets) {
+            log(`Zipping...`);
+            const file = await zipFile(buildDir, targetTag, isBeta);
+            log('DONE!', LogType.info);
+            log('Uploading...');
+            await client.repos.uploadReleaseAsset({
+                url: release.data.upload_url,
+                headers: file.headers,
+                file: file.buffer,
+                name: file.name,
+            });
+            log(`DONE! \n\n`, LogType.info);
+            const { doDelete } = await inquirer.prompt([{
+                    name: 'doDelete',
+                    message: `Delete build assets "${file.name}"?`,
+                    default: true,
+                    type: 'confirm',
+                }]);
+            if (doDelete === true) {
+                const fileToDelete = `${process.cwd()}${path.sep}${file.name}`;
+                log('\n\nDeleting...');
+                fs.unlinkSync(fileToDelete);
+                log('DONE! \n\n', LogType.info);
+            }
         }
     }
     catch (err) {
