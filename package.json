@@ -2,7 +2,9 @@
   "name": "github-release-util",
   "version": "1.0.0",
   "description": "Automates creating a github releases and uploading build assets.",
-  "bin": {"gh-release": "dist/index.js"},
+  "bin": {
+    "gh-release": "dist/index.js"
+  },
   "scripts": {
     "build": "./node_modules/.bin/tsc -p ./tsconfig.json",
     "test": "echo \"Error: no test specified\" && exit 1"

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
@@ -29,13 +30,13 @@ const log = (msg, type = LogType.log) => {
     }
     doRelease(config);
 })();
-const doRelease = async ({ targetTag, gitHubToken, isBeta, releaseMessage, releaseName, owner, repo, }) => {
+const doRelease = async ({ targetTag, gitHubToken, isBeta, releaseMessage, releaseName, owner, repo, buildDir, }) => {
     try {
         const client = new Octokit({
             auth: gitHubToken,
         });
         log(`Zipping...`);
-        const file = await zipFile(targetTag, isBeta);
+        const file = await zipFile(buildDir, targetTag, isBeta);
         log('DONE!', LogType.info);
         log(`\n\nCreating release...`);
         const release = await client.repos.createRelease({
@@ -75,10 +76,10 @@ const doRelease = async ({ targetTag, gitHubToken, isBeta, releaseMessage, relea
         process.exit();
     }
 };
-async function zipFile(tag, isBeta) {
+async function zipFile(dirName, tag, isBeta) {
     const filename = `${tag}_${isBeta ? 'beta' : 'prod'}_build-assets.zip`;
     const cwd = `${process.cwd()}${path.sep}`;
-    const buildDir = `${cwd}cdn`;
+    const buildDir = `${cwd}${dirName}`;
     const dirNotFoundError = `Build directory "${buildDir}" not found.`;
     let dirStats;
     try {
@@ -135,24 +136,6 @@ async function askQuestions() {
         process.exit(1);
     }
     const answers = await inquirer.prompt([{
-            name: 'gitHubToken',
-            message: 'GitHub token',
-            type: 'input',
-            default: process.env.GITHUB_TOKEN || '',
-            when: process.env.GITHUB_TOKEN === undefined
-        }, {
-            name: 'owner',
-            message: 'Repo owner (organization name/username)',
-            type: 'input',
-            default: process.env.GITHUB_OWNER || '',
-            when: process.env.GITHUB_OWNER === undefined,
-        }, {
-            name: 'repo',
-            message: 'Repo name',
-            type: 'input',
-            default: process.env.GITHUB_REPO || '',
-            when: process.env.GITHUB_REPO === undefined,
-        }, {
             name: 'isBeta',
             message: 'Is this a pre-release?',
             type: 'confirm',
@@ -180,10 +163,36 @@ async function askQuestions() {
             type: 'input',
             when: ({ prevTag, targetTag }) => !targetTag || !prevTag,
         }, {
+            name: 'shouldUploadBuildAssets',
+            message: 'Compress and upload build assets?',
+            type: 'confirm',
+            default: false,
+        }, {
+            name: 'buildDir',
+            message: 'Assets directory',
+            type: 'input',
+            default: 'cdn',
+            when: ({ shouldUploadBuildAssets }) => !!shouldUploadBuildAssets,
+        }, {
+            name: 'gitHubToken',
+            message: 'GitHub token',
+            type: 'input',
+            default: process.env.GITHUB_TOKEN || '',
+        }, {
+            name: 'owner',
+            message: 'Repo owner (organization name/username)',
+            type: 'input',
+            default: process.env.GITHUB_OWNER || '',
+        }, {
+            name: 'repo',
+            message: 'Repo name',
+            type: 'input',
+            default: process.env.GITHUB_REPO || '',
+        }, {
             name: 'confirmed',
             type: 'confirm',
             default: false,
-            message: async ({ gitHubToken, targetTag, prevTag, releaseName, isBeta, customReleaseMessage, owner, repo, }) => {
+            message: async ({ gitHubToken, targetTag, prevTag, releaseName, isBeta, customReleaseMessage, owner, repo, shouldUploadBuildAssets, buildDir }) => {
                 releaseMessage = prevTag && targetTag
                     ? await runCmd(`git log --pretty=format:"%ad - %h - %s" --date=short ${prevTag}..${targetTag}`)
                     : customReleaseMessage;
@@ -195,6 +204,9 @@ Prerelease: ${isBeta ? 'Yes' : 'No'}
 Release Name: ${releaseName}
 Release Message:
 ${releaseMessage}
+
+Upload Build Assets: ${shouldUploadBuildAssets ? 'Yes' : 'No'}
+${shouldUploadBuildAssets ? `Build Dir: ${buildDir}` : ''}
 
 Owner: ${owner}
 Repo: ${repo}

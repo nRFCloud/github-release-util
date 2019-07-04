@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 require('dotenv').config();
 
 const fs = require('fs');
@@ -24,6 +25,8 @@ type Config = {
 	releaseName: string,
 	owner: string,
 	repo: string,
+	buildDir: string,
+	shouldUploadBuildAssets: boolean,
 };
 
 enum LogType {
@@ -62,6 +65,7 @@ const doRelease = async ({
 	releaseName,
 	owner,
 	repo,
+	buildDir,
 }: Config): Promise<void> => {
 	try {
 		const client = new Octokit({
@@ -69,7 +73,7 @@ const doRelease = async ({
 		});
 
 		log(`Zipping...`);
-		const file: FileDetails = await zipFile(targetTag, isBeta);
+		const file: FileDetails = await zipFile(buildDir, targetTag, isBeta);
 		log('DONE!', LogType.info);
 
 		log(`\n\nCreating release...`);
@@ -113,10 +117,10 @@ const doRelease = async ({
 	}
 }
 
-async function zipFile(tag: string, isBeta: boolean): Promise<FileDetails> {
+async function zipFile(dirName: string, tag: string, isBeta: boolean): Promise<FileDetails> {
 	const filename = `${tag}_${isBeta ? 'beta' : 'prod'}_build-assets.zip`;
 	const cwd = `${process.cwd()}${path.sep}`;
-	const buildDir = `${cwd}cdn`;
+	const buildDir = `${cwd}${dirName}`;
 	const dirNotFoundError = `Build directory "${buildDir}" not found.`;
 	let dirStats;
 
@@ -186,24 +190,6 @@ async function askQuestions(): Promise<Config> {
 	}
 
 	const answers = await inquirer.prompt([{
-		name: 'gitHubToken',
-		message: 'GitHub token',
-		type: 'input',
-		default: process.env.GITHUB_TOKEN || '',
-		when: process.env.GITHUB_TOKEN === undefined
-	}, {
-		name: 'owner',
-		message: 'Repo owner (organization name/username)',
-		type: 'input',
-		default: process.env.GITHUB_OWNER || '',
-		when: process.env.GITHUB_OWNER === undefined,
-	}, {
-		name: 'repo',
-		message: 'Repo name',
-		type: 'input',
-		default: process.env.GITHUB_REPO || '',
-		when: process.env.GITHUB_REPO === undefined,
-	}, {
 		name: 'isBeta',
 		message: 'Is this a pre-release?',
 		type: 'confirm',
@@ -231,6 +217,32 @@ async function askQuestions(): Promise<Config> {
 		type: 'input',
 		when: ({prevTag, targetTag}) => !targetTag || !prevTag,
 	}, {
+		name: 'shouldUploadBuildAssets',
+		message: 'Compress and upload build assets?',
+		type: 'confirm',
+		default: false,
+	},  {
+		name: 'buildDir',
+		message: 'Assets directory',
+		type: 'input',
+		default: 'cdn',
+		when: ({shouldUploadBuildAssets}) => !!shouldUploadBuildAssets,
+	},{
+		name: 'gitHubToken',
+		message: 'GitHub token',
+		type: 'input',
+		default: process.env.GITHUB_TOKEN || '',
+	}, {
+		name: 'owner',
+		message: 'Repo owner (organization name/username)',
+		type: 'input',
+		default: process.env.GITHUB_OWNER || '',
+	}, {
+		name: 'repo',
+		message: 'Repo name',
+		type: 'input',
+		default: process.env.GITHUB_REPO || '',
+	}, {
 		name: 'confirmed',
 		type: 'confirm',
 		default: false,
@@ -243,6 +255,8 @@ async function askQuestions(): Promise<Config> {
 			customReleaseMessage,
 			owner,
 			repo,
+			shouldUploadBuildAssets,
+			buildDir
 		}) => {
 			releaseMessage = prevTag && targetTag 
 				? await runCmd(`git log --pretty=format:"%ad - %h - %s" --date=short ${prevTag}..${targetTag}`)
@@ -256,6 +270,9 @@ Prerelease: ${isBeta ? 'Yes' : 'No'}
 Release Name: ${releaseName}
 Release Message:
 ${releaseMessage}
+
+Upload Build Assets: ${shouldUploadBuildAssets ? 'Yes' : 'No'}
+${shouldUploadBuildAssets ? `Build Dir: ${buildDir}` : ''}
 
 Owner: ${owner}
 Repo: ${repo}
