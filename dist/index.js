@@ -23,7 +23,7 @@ const log = (msg, type = LogType.log) => {
     console.log(chalk[colors[type]](msg));
 };
 (async () => {
-    const config = await getConfig();
+    const config = await askQuestions();
     if (!config.confirmed) {
         process.exit();
     }
@@ -79,7 +79,7 @@ async function zipFile(tag, isBeta) {
     const filename = `${tag}_${isBeta ? 'beta' : 'prod'}_build-assets.zip`;
     const cwd = `${process.cwd()}${path.sep}`;
     const buildDir = `${cwd}cdn`;
-    const dirNotFoundError = `Build directory "${buildDir}" not found. Try 'npm run build:<env>' to create it.`;
+    const dirNotFoundError = `Build directory "${buildDir}" not found.`;
     let dirStats;
     try {
         dirStats = fs.statSync(buildDir);
@@ -119,7 +119,7 @@ async function zipFile(tag, isBeta) {
         archive.finalize();
     });
 }
-async function getConfig() {
+async function askQuestions() {
     const runCmd = (cmd) => new Promise((resolve, reject) => {
         require('child_process').exec(cmd, (err, stdout) => {
             if (err)

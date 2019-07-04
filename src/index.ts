@@ -45,7 +45,7 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 }
 
 (async () => {
- 	const config: Config = await getConfig();
+ 	const config: Config = await askQuestions();
 
 	if (!config.confirmed) {
 		process.exit();
@@ -117,7 +117,7 @@ async function zipFile(tag: string, isBeta: boolean): Promise<FileDetails> {
 	const filename = `${tag}_${isBeta ? 'beta' : 'prod'}_build-assets.zip`;
 	const cwd = `${process.cwd()}${path.sep}`;
 	const buildDir = `${cwd}cdn`;
-	const dirNotFoundError = `Build directory "${buildDir}" not found. Try 'npm run build:<env>' to create it.`;
+	const dirNotFoundError = `Build directory "${buildDir}" not found.`;
 	let dirStats;
 
 	try {
@@ -167,7 +167,7 @@ async function zipFile(tag: string, isBeta: boolean): Promise<FileDetails> {
 	});
 }
 
-async function getConfig(): Promise<Config> {
+async function askQuestions(): Promise<Config> {
 	const runCmd = (cmd: string): Promise<string> =>
 		new Promise((resolve, reject) => {
 			require('child_process').exec(cmd, (err, stdout: string) => {
