@@ -1,0 +1,208 @@
+require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
+const chalk = require('chalk');
+const mime = require('mime-types');
+const archiver = require('archiver');
+const inquirer = require('inquirer');
+const Octokit = require('@octokit/rest');
+var LogType;
+(function (LogType) {
+    LogType[LogType["info"] = 0] = "info";
+    LogType[LogType["log"] = 1] = "log";
+    LogType[LogType["error"] = 2] = "error";
+    LogType[LogType["debug"] = 3] = "debug";
+})(LogType || (LogType = {}));
+const log = (msg, type = LogType.log) => {
+    const colors = {
+        [LogType.info]: 'gray',
+        [LogType.log]: 'cyan',
+        [LogType.error]: 'red',
+        [LogType.debug]: 'yellow',
+    };
+    console.log(chalk[colors[type]](msg));
+};
+(async () => {
+    const config = await getConfig();
+    if (!config.confirmed) {
+        process.exit();
+    }
+    doRelease(config);
+})();
+const doRelease = async ({ targetTag, gitHubToken, isBeta, releaseMessage, releaseName, owner, repo, }) => {
+    try {
+        const client = new Octokit({
+            auth: gitHubToken,
+        });
+        log(`Zipping...`);
+        const file = await zipFile(targetTag, isBeta);
+        log('DONE!', LogType.info);
+        log(`\n\nCreating release...`);
+        const release = await client.repos.createRelease({
+            owner,
+            repo,
+            name: releaseName,
+            body: releaseMessage,
+            tag_name: targetTag,
+            prerelease: isBeta,
+        });
+        log('DONE!\n\n', LogType.info);
+        log('Uploading...');
+        await client.repos.uploadReleaseAsset({
+            url: release.data.upload_url,
+            headers: file.headers,
+            file: file.buffer,
+            name: file.name,
+        });
+        log(`DONE! \n\n`, LogType.info);
+        const { doDelete } = await inquirer.prompt([{
+                name: 'doDelete',
+                message: `Delete build assets "${file.name}"?`,
+                default: true,
+                type: 'confirm',
+            }]);
+        if (doDelete === true) {
+            const fileToDelete = `${process.cwd()}${path.sep}${file.name}`;
+            log('\n\nDeleting...');
+            fs.unlinkSync(fileToDelete);
+            log('DONE! \n\n', LogType.info);
+        }
+    }
+    catch (err) {
+        log(`Error with release: "${err}"`, LogType.error);
+    }
+    finally {
+        process.exit();
+    }
+};
+async function zipFile(tag, isBeta) {
+    const filename = `${tag}_${isBeta ? 'beta' : 'prod'}_build-assets.zip`;
+    const cwd = `${process.cwd()}${path.sep}`;
+    const buildDir = `${cwd}cdn`;
+    const dirNotFoundError = `Build directory "${buildDir}" not found. Try 'npm run build:<env>' to create it.`;
+    let dirStats;
+    try {
+        dirStats = fs.statSync(buildDir);
+    }
+    catch (err) {
+        throw new Error(dirNotFoundError);
+    }
+    if (!dirStats.isDirectory()) {
+        throw new Error(dirNotFoundError);
+    }
+    return new Promise((resolve, reject) => {
+        const archive = archiver('zip');
+        const output = fs.createWriteStream(`${cwd}${filename}`);
+        output.on('close', () => {
+            const fullPath = path.resolve(`.${path.sep}`, filename);
+            const stats = fs.statSync(fullPath);
+            if (!stats.isFile()) {
+                reject(`Could not find file "${fullPath}"`);
+            }
+            const headers = {
+                'Content-Type': mime.lookup(fullPath),
+                'Content-Length': stats.size,
+            };
+            const buffer = fs.readFileSync(fullPath);
+            resolve({
+                name: filename,
+                fullPath,
+                headers,
+                buffer,
+            });
+        });
+        archive.on('error', err => {
+            reject(err);
+        });
+        archive.pipe(output);
+        archive.glob(`cdn/**/*`);
+        archive.finalize();
+    });
+}
+async function getConfig() {
+    const runCmd = (cmd) => new Promise((resolve, reject) => {
+        require('child_process').exec(cmd, (err, stdout) => {
+            if (err)
+                reject(`Command "${cmd}" failed. Error: "${err}"`);
+            resolve(stdout);
+        });
+    });
+    const tags = await runCmd(`git tag`);
+    const fiveMostRecentTags = tags ? tags.split('\n').slice(-5).reverse() : null;
+    let releaseMessage = '';
+    if (!fiveMostRecentTags) {
+        log(`At least one tag required to create a release.`, LogType.error);
+        process.exit(1);
+    }
+    const answers = await inquirer.prompt([{
+            name: 'gitHubToken',
+            message: 'GitHub token',
+            type: 'input',
+            default: process.env.GITHUB_TOKEN || '',
+            when: process.env.GITHUB_TOKEN === undefined
+        }, {
+            name: 'owner',
+            message: 'Repo owner (organization name/username)',
+            type: 'input',
+            default: process.env.GITHUB_OWNER || '',
+            when: process.env.GITHUB_OWNER === undefined,
+        }, {
+            name: 'repo',
+            message: 'Repo name',
+            type: 'input',
+            default: process.env.GITHUB_REPO || '',
+            when: process.env.GITHUB_REPO === undefined,
+        }, {
+            name: 'isBeta',
+            message: 'Is this a pre-release?',
+            type: 'confirm',
+            default: false,
+        }, {
+            name: 'targetTag',
+            message: 'Which tag is this release for? (choose one)',
+            type: 'list',
+            choices: fiveMostRecentTags,
+            when: () => !!fiveMostRecentTags
+        }, {
+            name: 'prevTag',
+            message: 'What is the previous tag? (choose one)',
+            type: 'list',
+            choices: answers => fiveMostRecentTags && fiveMostRecentTags.filter(tag => tag !== answers.targetTag),
+            when: () => !!fiveMostRecentTags,
+        }, {
+            name: 'releaseName',
+            message: 'Release name',
+            type: 'input',
+            default: ({ targetTag }) => targetTag,
+        }, {
+            name: 'customReleaseMessage',
+            message: 'Release message',
+            type: 'input',
+            when: ({ prevTag, targetTag }) => !targetTag || !prevTag,
+        }, {
+            name: 'confirmed',
+            type: 'confirm',
+            default: false,
+            message: async ({ gitHubToken, targetTag, prevTag, releaseName, isBeta, customReleaseMessage, owner, repo, }) => {
+                releaseMessage = prevTag && targetTag
+                    ? await runCmd(`git log --pretty=format:"%ad - %h - %s" --date=short ${prevTag}..${targetTag}`)
+                    : customReleaseMessage;
+                return `
+You are about to create a release on GitHub:
+
+Tag: ${targetTag}
+Prerelease: ${isBeta ? 'Yes' : 'No'}
+Release Name: ${releaseName}
+Release Message:
+${releaseMessage}
+
+Owner: ${owner}
+Repo: ${repo}
+Token: ${gitHubToken}
+
+Are you sure?`;
+            },
+        }]);
+    answers.releaseMessage = releaseMessage;
+    return answers;
+}

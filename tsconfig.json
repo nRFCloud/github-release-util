@@ -1,0 +1,29 @@
+{
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "node",
+		"isolatedModules": false,
+		"jsx": "react",
+		"experimentalDecorators": true,
+		"emitDecoratorMetadata": true,
+		"declaration": false,
+		"noImplicitAny": false,
+		"noImplicitUseStrict": false,
+		"removeComments": true,
+		"noLib": false,
+		"preserveConstEnums": true,
+		"suppressImplicitAnyIndexErrors": true,
+		"allowSyntheticDefaultImports": true,
+		"esModuleInterop": true,
+		"allowJs": true,
+		"lib": [
+			"dom",
+			"es6"
+		],
+		"outDir": "dist",
+	},
+	"files": [
+		"src/index.ts"
+	]
+}
