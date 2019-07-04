@@ -14,6 +14,10 @@
     "release",
     "cli"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/coleHafner/github-release-util"
+  },
   "author": "cole hafner",
   "license": "ISC",
   "devDependencies": {
