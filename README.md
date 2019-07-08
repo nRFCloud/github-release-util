@@ -13,11 +13,11 @@ To use with your project install (`npm i -D github-release-util`) and add the fo
 
 To run directly from the command line:
 ```
-npx gh-release
+npx ghr
 ```
 
 ## Configuration
-This script automatically looks for a `.env` file at the project root. The repo includes a `.env.sample` file. To use with your project, run `cp node_modules/github-release-util/.env.sample .env`. The file includes the following config variables:
+This script automatically looks for a `.env` file at the project root. The repo includes a `.env.sample` file. To use with your project, run `cp node_modules/github-release-util/.env.sample ./.env`. The file includes the following config variables:
 
 ```
 GITHUB_REPO=
