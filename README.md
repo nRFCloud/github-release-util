@@ -13,7 +13,7 @@ To use with your project install (`npm i -D github-release-util`) and add the fo
 
 To run directly from the command line:
 ```
-npx ghr
+npx github-release-util
 ```
 
 ## Configuration
