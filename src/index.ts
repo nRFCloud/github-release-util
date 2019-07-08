@@ -8,6 +8,7 @@ const mime = require('mime-types');
 const archiver = require('archiver');
 const inquirer = require('inquirer');
 const Octokit = require('@octokit/rest');
+const program = require('commander');
 
 type FileDetails = {
 	name: string;
@@ -27,6 +28,7 @@ type Config = {
 	repo: string,
 	buildDir: string,
 	shouldUploadBuildAssets: boolean,
+	noPrompt: boolean,
 };
 
 enum LogType {
@@ -48,7 +50,31 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 }
 
 (async () => {
- 	const config: Config = await askQuestions();
+	// for cli
+	let config: Config;
+	// console.log('process.argv', process.argv);
+
+	if (process.argv[2].toLowerCase().trim() === '--no-prompt') {
+		program
+			.option('-o, --owner <owner>', 'Owner')
+			.option('-r, --repo <repo>', 'Repo')
+			.option('-k, --git-hub-token <gitHubToken>', 'GitHub Token')
+			.option('-n, --release-name <releaseName>', 'Release Name')
+			.option('-m, --release-message <releaseMessage>', 'Release Message')
+			.option('-t, --target-tag <targetTag>', 'Release Tag')
+			.option('-b, --is-beta', 'Is beta release')
+			.option('-c, --should-upload-build-assets', 'Compress and upload build assets')
+			.option('-d, --build-dir <buildDir>', 'Build dir')
+			.option('-p, --no-prompt', 'No prompt')
+			.parse(process.argv);
+
+		config = program.opts();
+		config.confirmed = true;
+		if (!config.releaseName) config.releaseName = config.targetTag;
+
+	}else {
+		 config = await askQuestions();
+	}
 
 	if (!config.confirmed) {
 		process.exit();
@@ -57,7 +83,7 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 	doRelease(config);
 })();
 
-const doRelease = async ({
+async function doRelease ({
 	targetTag,
 	gitHubToken,
 	isBeta,
@@ -67,7 +93,8 @@ const doRelease = async ({
 	repo,
 	buildDir,
 	shouldUploadBuildAssets,
-}: Config): Promise<void> => {
+	noPrompt,
+}: Config): Promise<void> {
 	try {
 		const client = new Octokit({
 			auth: gitHubToken,
@@ -82,40 +109,43 @@ const doRelease = async ({
 				tag_name: targetTag,
 				prerelease: isBeta,
 			});
-		log('DONE!\n\n', LogType.info);
+		log('DONE!', LogType.info);
 
 		if (shouldUploadBuildAssets) {
-			log(`Zipping...`);
+			log(`\n\nZipping...`);
 			const file: FileDetails = await zipFile(buildDir, targetTag, isBeta);
 			log('DONE!', LogType.info);
 
-			log('Uploading...');
+			log('\n\nUploading...');
 			await client.repos.uploadReleaseAsset({
 				url: release.data.upload_url,
 				headers: file.headers,
 				file: file.buffer,
 				name: file.name,
 			});
-			log(`DONE! \n\n`, LogType.info);
+			log(`DONE!`, LogType.info);
 
-			const { doDelete } = await inquirer.prompt([{
-				name: 'doDelete',
-				message: `Delete build assets "${file.name}"?`,
-				default: true,
-				type: 'confirm',
-			}]);
+			const { doDelete } = noPrompt === false 
+				? await inquirer.prompt([{
+					name: 'doDelete',
+					message: `Delete build assets "${file.name}"?`,
+					default: true,
+					type: 'confirm',
+				}])
+				: { doDelete: true};
 			
 			if (doDelete === true) {
 				const fileToDelete = `${process.cwd()}${path.sep}${file.name}`;
 
 				log('\n\nDeleting...');
 				fs.unlinkSync(fileToDelete);
-				log('DONE! \n\n', LogType.info);
+				log('DONE!', LogType.info);
 			}
 		}
 	} catch (err) {
 		log(`Error with release: "${err}"`, LogType.error);
 	} finally {
+		log('\n\n');
 		process.exit();
 	}
 }
@@ -169,7 +199,7 @@ async function zipFile(dirName: string, tag: string, isBeta: boolean): Promise<F
 		});
 
 		archive.pipe(output);
-		archive.glob(`cdn/**/*`);
+		archive.glob(`${dirName}/**/*`);
 		archive.finalize();
 	});
 }
@@ -285,6 +315,7 @@ Are you sure?`;
 		},
 	}]);
 
+	answers.noPrompt = false;
 	answers.releaseMessage = releaseMessage;
 	return answers;
 }

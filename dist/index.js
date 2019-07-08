@@ -7,6 +7,7 @@ const mime = require('mime-types');
 const archiver = require('archiver');
 const inquirer = require('inquirer');
 const Octokit = require('@octokit/rest');
+const program = require('commander');
 var LogType;
 (function (LogType) {
     LogType[LogType["info"] = 0] = "info";
@@ -24,13 +25,34 @@ const log = (msg, type = LogType.log) => {
     console.log(chalk[colors[type]](msg));
 };
 (async () => {
-    const config = await askQuestions();
+    let config;
+    if (process.argv[2].toLowerCase().trim() === '--no-prompt') {
+        program
+            .option('-o, --owner <owner>', 'Owner')
+            .option('-r, --repo <repo>', 'Repo')
+            .option('-k, --git-hub-token <gitHubToken>', 'GitHub Token')
+            .option('-n, --release-name <releaseName>', 'Release Name')
+            .option('-m, --release-message <releaseMessage>', 'Release Message')
+            .option('-t, --target-tag <targetTag>', 'Release Tag')
+            .option('-b, --is-beta', 'Is beta release')
+            .option('-c, --should-upload-build-assets', 'Compress and upload build assets')
+            .option('-d, --build-dir <buildDir>', 'Build dir')
+            .option('-p, --no-prompt', 'No prompt')
+            .parse(process.argv);
+        config = program.opts();
+        config.confirmed = true;
+        if (!config.releaseName)
+            config.releaseName = config.targetTag;
+    }
+    else {
+        config = await askQuestions();
+    }
     if (!config.confirmed) {
         process.exit();
     }
     doRelease(config);
 })();
-const doRelease = async ({ targetTag, gitHubToken, isBeta, releaseMessage, releaseName, owner, repo, buildDir, shouldUploadBuildAssets, }) => {
+async function doRelease({ targetTag, gitHubToken, isBeta, releaseMessage, releaseName, owner, repo, buildDir, shouldUploadBuildAssets, noPrompt, }) {
     try {
         const client = new Octokit({
             auth: gitHubToken,
@@ -44,30 +66,32 @@ const doRelease = async ({ targetTag, gitHubToken, isBeta, releaseMessage, relea
             tag_name: targetTag,
             prerelease: isBeta,
         });
-        log('DONE!\n\n', LogType.info);
+        log('DONE!', LogType.info);
         if (shouldUploadBuildAssets) {
-            log(`Zipping...`);
+            log(`\n\nZipping...`);
             const file = await zipFile(buildDir, targetTag, isBeta);
             log('DONE!', LogType.info);
-            log('Uploading...');
+            log('\n\nUploading...');
             await client.repos.uploadReleaseAsset({
                 url: release.data.upload_url,
                 headers: file.headers,
                 file: file.buffer,
                 name: file.name,
             });
-            log(`DONE! \n\n`, LogType.info);
-            const { doDelete } = await inquirer.prompt([{
-                    name: 'doDelete',
-                    message: `Delete build assets "${file.name}"?`,
-                    default: true,
-                    type: 'confirm',
-                }]);
+            log(`DONE!`, LogType.info);
+            const { doDelete } = noPrompt === false
+                ? await inquirer.prompt([{
+                        name: 'doDelete',
+                        message: `Delete build assets "${file.name}"?`,
+                        default: true,
+                        type: 'confirm',
+                    }])
+                : { doDelete: true };
             if (doDelete === true) {
                 const fileToDelete = `${process.cwd()}${path.sep}${file.name}`;
                 log('\n\nDeleting...');
                 fs.unlinkSync(fileToDelete);
-                log('DONE! \n\n', LogType.info);
+                log('DONE!', LogType.info);
             }
         }
     }
@@ -75,9 +99,10 @@ const doRelease = async ({ targetTag, gitHubToken, isBeta, releaseMessage, relea
         log(`Error with release: "${err}"`, LogType.error);
     }
     finally {
+        log('\n\n');
         process.exit();
     }
-};
+}
 async function zipFile(dirName, tag, isBeta) {
     const filename = `${tag}_${isBeta ? 'beta' : 'prod'}_build-assets.zip`;
     const cwd = `${process.cwd()}${path.sep}`;
@@ -118,7 +143,7 @@ async function zipFile(dirName, tag, isBeta) {
             reject(err);
         });
         archive.pipe(output);
-        archive.glob(`cdn/**/*`);
+        archive.glob(`${dirName}/**/*`);
         archive.finalize();
     });
 }
@@ -217,6 +242,7 @@ Token: ${gitHubToken}
 Are you sure?`;
             },
         }]);
+    answers.noPrompt = false;
     answers.releaseMessage = releaseMessage;
     return answers;
 }
