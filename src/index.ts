@@ -28,7 +28,7 @@ type Config = {
 	repo: string,
 	buildDir: string,
 	shouldUploadBuildAssets: boolean,
-	noPrompt: boolean,
+	cli: boolean,
 };
 
 enum LogType {
@@ -50,11 +50,15 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 }
 
 (async () => {
-	// for cli
 	let config: Config;
-	// console.log('process.argv', process.argv);
 
-	if (process.argv && process.argv[2] && process.argv[2].toLowerCase().trim() === '--no-prompt') {
+	if (
+		process.argv && 
+		process.argv[2] && (
+			process.argv[2].toLowerCase().trim() === '--cli' || 
+			process.argv[2].toLowerCase().trim() === '-l'
+		)
+	) {
 		program
 			.option('-o, --owner <owner>', 'Owner')
 			.option('-r, --repo <repo>', 'Repo')
@@ -65,13 +69,16 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 			.option('-b, --is-beta', 'Is beta release')
 			.option('-c, --should-upload-build-assets', 'Compress and upload build assets')
 			.option('-d, --build-dir <buildDir>', 'Build dir')
-			.option('-p, --no-prompt', 'No prompt')
+			.option('-l, --cli', 'Cli')
 			.parse(process.argv);
 
 		config = program.opts();
 		config.confirmed = true;
-		if (!config.releaseName) config.releaseName = config.targetTag;
 
+		if (!config.releaseName) config.releaseName = config.targetTag;
+		if (!config.gitHubToken) config.gitHubToken = process.env.GITHUB_TOKEN || '';
+		if (!config.owner) config.owner = process.env.GITHUB_OWNER || '';
+		if (!config.repo) config.repo = process.env.GITHUB_REPO || '';
 	}else {
 		 config = await askQuestions();
 	}
@@ -83,22 +90,37 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 	doRelease(config);
 })();
 
-async function doRelease ({
-	targetTag,
-	gitHubToken,
-	isBeta,
-	releaseMessage,
-	releaseName,
-	owner,
-	repo,
-	buildDir,
-	shouldUploadBuildAssets,
-	noPrompt,
-}: Config): Promise<void> {
+async function doRelease (config: Config): Promise<void> {
+	const {
+		targetTag,
+		gitHubToken,
+		isBeta,
+		releaseMessage,
+		releaseName,
+		owner,
+		repo,
+		buildDir,
+		shouldUploadBuildAssets,
+		cli,
+	} = config;
+
 	try {
+		if (!(gitHubToken && owner && repo && targetTag)) {
+			throw new Error(`Token, owner, repo, and tag are required.`);
+		}
+
 		const client = new Octokit({
 			auth: gitHubToken,
 		});
+
+		log(`\n\nConfig:`)
+		log(
+			Object
+				.keys(config)
+				.map(key => `${key}: ${config[key]}`)
+				.join('\n'),
+			LogType.info
+		);
 
 		log(`\n\nCreating release...`);
 		const release = await client.repos.createRelease({
@@ -125,7 +147,7 @@ async function doRelease ({
 			});
 			log(`DONE!`, LogType.info);
 
-			const { doDelete } = noPrompt === false 
+			const { doDelete } = cli === false 
 				? await inquirer.prompt([{
 					name: 'doDelete',
 					message: `Delete build assets "${file.name}"?`,
@@ -214,7 +236,14 @@ async function askQuestions(): Promise<Config> {
 		})
 
 	const tags = await runCmd(`git tag`);
-	const fiveMostRecentTags = tags ? tags.split('\n').slice(-5).reverse() : null;
+	const fiveMostRecentTags = tags 
+		? tags
+			.split('\n')
+			.slice(-5)
+			.reverse()
+			.filter(tag => tag.length) 
+		: null;
+
 	let releaseMessage = '';
 
 	if (!fiveMostRecentTags) {
@@ -315,7 +344,7 @@ Are you sure?`;
 		},
 	}]);
 
-	answers.noPrompt = false;
+	answers.cli = false;
 	answers.releaseMessage = releaseMessage;
 	return answers;
 }

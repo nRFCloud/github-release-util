@@ -13,8 +13,8 @@ To use with your project install (`npm i -D github-release-util`) and add the fo
 }
 ```
 
-### Non-interactive mode
-By default this script walks the user through the decisions to create a release. It also has an option to send in all the options at once (no prompt). The following is an example of the available options. You can get this output by running `npx github-release-util --no-prompt --help`.
+### CLI mode
+By default this script walks the user through the decisions to create a release. It also has an option to send in all the options at once (no prompt). The following is an example of the available options. You can get this output by running `npx github-release-util --cli --help`.
 
 ```sh
 Usage: index.ts [options]
@@ -29,15 +29,18 @@ Options:
   -b, --is-beta                           Is beta release
   -c, --should-upload-build-assets        Compress and upload build assets
   -d, --build-dir <buildDir>              Build dir
-  -p, --no-prompt                         No prompt
+  -l, --cli                               Cli
   -h, --help                              output usage information
 
-# example
-npx github-release-util --no-prompt -o <owner> --r <repo name> -k <gitHub token> -t "<tag>"
+# without build assets
+npx github-release-util --cli -t "<tag>"
+
+# with build assets
+npx github-release-util --cli -t "<tag>" -c -d "<build dir>"
 ```
 
 ## Configuration
-This script automatically looks for a `.env` file at the project root (only true for interactive mode). The repo includes a `.env.sample` file. To use with your project, run `cp node_modules/github-release-util/.env.sample ./.env`. The file includes the following config variables:
+This script automatically looks for a `.env` file at the project root. The repo includes a `.env.sample` file. To use with your project, run `cp node_modules/github-release-util/.env.sample ./.env`. The file includes the following config variables:
 
 ```
 GITHUB_REPO=
@@ -45,7 +48,9 @@ GITHUB_OWNER=
 GITHUB_TOKEN=
 ```
 
-You will always be prompted for these, the values from the `.env` file will be set as the defaults if the file exists.
+In interactive mode, you will always be prompted for these, the values from the `.env` file will be set as the defaults if the file exists.
+
+In CLI mode, the script will fall back to these defaults if arguments aren't passed in explicitly. 
 
 Get a GitHub token by [following these steps](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line).
 
