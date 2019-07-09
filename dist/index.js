@@ -26,7 +26,7 @@ const log = (msg, type = LogType.log) => {
 };
 (async () => {
     let config;
-    if (process.argv[2].toLowerCase().trim() === '--no-prompt') {
+    if (process.argv && process.argv[2] && process.argv[2].toLowerCase().trim() === '--no-prompt') {
         program
             .option('-o, --owner <owner>', 'Owner')
             .option('-r, --repo <repo>', 'Repo')
