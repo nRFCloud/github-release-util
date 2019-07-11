@@ -1,6 +1,6 @@
 {
   "name": "github-release-util",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Automates creating a github releases and uploading build assets.",
   "bin": {
     "ghr": "dist/index.js"
