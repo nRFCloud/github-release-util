@@ -8,13 +8,13 @@ To use with your project install (`npm i -D github-release-util`) and add the fo
 ```
 {
     "scripts": {
-        "release": "./node_modules/github-release-util/dist/index.js"
+        "release": "npx gru"
     }
 }
 ```
 
 ### CLI mode
-By default this script walks the user through the decisions to create a release. It also has an option to send in all the options at once (no prompt). The following is an example of the available options. You can get this output by running `npx github-release-util --cli --help`.
+By default this script walks the user through the decisions to create a release. It also has an option to send in all the options at once (no prompt). The following is an example of the available options. You can get this output by running `npx gru --cli --help`.
 
 ```sh
 Usage: index.ts [options]
@@ -33,10 +33,10 @@ Options:
   -h, --help                              output usage information
 
 # without build assets
-npx github-release-util --cli -t "<tag>"
+npx gru --cli -t "<tag>"
 
 # with build assets
-npx github-release-util --cli -t "<tag>" -c -d "<build dir>"
+npx gru --cli -t "<tag>" -c -d "<build dir>"
 ```
 
 ## Configuration
