@@ -1,5 +1,5 @@
 {
-  "name": "github-release-util",
+  "name": "@nrfcloud/github-release-util",
   "version": "2.1.0",
   "description": "Automates creating a github releases and uploading build assets.",
   "bin": {
