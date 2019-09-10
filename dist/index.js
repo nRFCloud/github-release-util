@@ -38,17 +38,18 @@ const getTagBasedMessage = async (prevTag, targetTag) => await runCmd(`git log -
         process.argv[2] && (process.argv[2].toLowerCase().trim() === '--cli' ||
         process.argv[2].toLowerCase().trim() === '-l')) {
         program
-            .option('-o, --owner <owner>', 'Owner')
-            .option('-r, --repo <repo>', 'Repo')
-            .option('-k, --git-hub-token <gitHubToken>', 'GitHub Token')
-            .option('-n, --release-name <releaseName>', 'Release Name')
-            .option('-m, --release-message <releaseMessage>', 'Release Message')
-            .option('-t, --target-tag <targetTag>', 'Release Tag')
-            .option('-p, --prev-tag <prevTag>', 'Previous Tag (for commit message purposes, only used if release message is not defined)')
+            .option('-o, --owner <owner>', 'owner (default to .env file)')
+            .option('-r, --repo <repo>', 'repo (default to .env file)')
+            .option('-k, --git-hub-token <gitHubToken>', 'gitHub token (default to .env file)')
+            .option('-n, --release-name <releaseName>', 'release name (default to tag)')
+            .option('-m, --release-message <releaseMessage>', 'release message')
+            .option('-t, --target-tag <targetTag>', 'release tag')
+            .option('-p, --prev-tag <prevTag>', 'previous tag (for commit message purposes, only used if release message is not defined)')
             .option('-b, --is-beta', 'Is beta release')
-            .option('-c, --should-upload-build-assets', 'Compress and upload build assets')
-            .option('-d, --build-dir <buildDir>', 'Build dir')
-            .option('-l, --cli', 'Cli')
+            .option('-c, --should-upload-build-assets', 'compress and upload build assets')
+            .option('-d, --build-dir <buildDir>', 'build dir')
+            .option('-l, --cli', 'cli')
+            .option('-v, --show-token', 'show token (shows token in output, defaults to false.)')
             .parse(process.argv);
         config = program.opts();
         config.confirmed = true;
@@ -84,7 +85,10 @@ async function doRelease(config) {
         log(`\n\nConfig:`);
         log(Object
             .keys(config)
-            .map(key => `${key}: ${config[key]}`)
+            .map(key => {
+            const val = config.showToken && key === 'gitHubToken' && !config.showToken ? '<secret>' : config[key];
+            return `${key}: ${val}`;
+        })
             .join('\n'), LogType.info);
         log(`\n\nCreating release...`);
         const release = await client.repos.createRelease({
@@ -229,28 +233,40 @@ async function askQuestions() {
             default: 'cdn',
             when: ({ shouldUploadBuildAssets }) => !!shouldUploadBuildAssets,
         }, {
+            name: 'showToken',
+            message: 'Show sensitive details in output?',
+            type: 'confirm',
+            default: false,
+        }, {
             name: 'gitHubToken',
             message: 'GitHub token',
             type: 'input',
-            default: process.env.GITHUB_TOKEN || '',
+            when: () => !process.env.GITHUB_TOKEN
         }, {
             name: 'owner',
             message: 'Repo owner (organization name/username)',
             type: 'input',
-            default: process.env.GITHUB_OWNER || '',
+            when: () => !process.env.GITHUB_OWNER,
         }, {
             name: 'repo',
             message: 'Repo name',
             type: 'input',
-            default: process.env.GITHUB_REPO || '',
+            when: () => !process.env.GITHUB_REPO,
         }, {
             name: 'confirmed',
             type: 'confirm',
             default: false,
-            message: async ({ gitHubToken, targetTag, prevTag, releaseName, isBeta, customReleaseMessage, owner, repo, shouldUploadBuildAssets, buildDir }) => {
+            message: async (answers) => {
+                const { gitHubToken, targetTag, prevTag, releaseName, isBeta, customReleaseMessage, owner, repo, shouldUploadBuildAssets, buildDir, showToken, } = answers;
                 releaseMessage = prevTag && targetTag
-                    ? getTagBasedMessage(prevTag, targetTag)
+                    ? await getTagBasedMessage(prevTag, targetTag)
                     : customReleaseMessage;
+                if (!gitHubToken)
+                    answers.gitHubToken = process.env.GITHUB_TOKEN;
+                if (!owner)
+                    answers.owner = process.env.GITHUB_OWNER;
+                if (!repo)
+                    answers.repo = process.env.GITHUB_REPO;
                 return `
 You are about to create a release on GitHub:
 
@@ -263,9 +279,9 @@ ${releaseMessage}
 Upload Build Assets: ${shouldUploadBuildAssets ? 'Yes' : 'No'}
 ${shouldUploadBuildAssets ? `Build Dir: ${buildDir}` : ''}
 
-Owner: ${owner}
-Repo: ${repo}
-Token: ${gitHubToken}
+Owner: ${answers.owner}
+Repo: ${answers.repo}
+Token: ${showToken ? answers.gitHubToken : '<secret>'}
 
 Are you sure?`;
             },
