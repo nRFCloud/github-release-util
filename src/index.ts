@@ -137,7 +137,7 @@ async function doRelease (config: Config): Promise<void> {
 			Object
 				.keys(config)
 				.map(key => {
-					const val: string = config.showToken && key === 'gitHubToken' && config.showToken !== true ? '<secret>' : config[key];
+					const val: string = key === 'gitHubToken' && config.showToken !== true ? '<secret>' : config[key];
 					return `${key}: ${val}`
 				})
 				.join('\n'),
