@@ -8,7 +8,7 @@ To use with your project install (`npm i -D github-release-util`) and add the fo
 ```
 {
     "scripts": {
-        "release": "npx gru"
+        "release": "gru"
     }
 }
 ```
@@ -38,6 +38,9 @@ npx gru --cli -t "<tag>"
 
 # with build assets
 npx gru --cli -t "<tag>" -c -d "<build dir>"
+
+# this can also be called without the alias by using the following:
+npx @nrfcloud/github-release-util --cli -t "<tag>" -c -d "<build dir>"
 ```
 
 ## Configuration
