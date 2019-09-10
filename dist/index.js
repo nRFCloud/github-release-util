@@ -86,7 +86,7 @@ async function doRelease(config) {
         log(Object
             .keys(config)
             .map(key => {
-            const val = config.showToken && key === 'gitHubToken' && !config.showToken ? '<secret>' : config[key];
+            const val = config.showToken && key === 'gitHubToken' && config.showToken !== true ? '<secret>' : config[key];
             return `${key}: ${val}`;
         })
             .join('\n'), LogType.info);
