@@ -1,10 +1,10 @@
-# github-release-util
+# @nrfcloud/github-release-util
 Utility script to automate gitHub release workflow and uploading of build assets (optional). 
 
 ## Usage
 
 ### Interactive Mode
-To use with your project install (`npm i -D github-release-util`) and add the following to your `package.json`. Afterwards, you can run `npm run release` to automatically create a new release on GitHub.
+To use with your project install (`npm i -D @nrfcloud/github-release-util`) and add the following to your `package.json`. Afterwards, you can run `npm run release` to automatically create a new release on GitHub.
 ```
 {
     "scripts": {
@@ -16,21 +16,22 @@ To use with your project install (`npm i -D github-release-util`) and add the fo
 ### CLI mode
 By default this script walks the user through the decisions to create a release. It also has an option to send in all the options at once (no prompt). The following is an example of the available options. You can get this output by running `npx gru --cli --help`.
 
-```sh
+```
 Usage: index.ts [options]
 
 Options:
-  -o, --owner <owner>                     Owner
-  -r, --repo <repo>                       Repo
-  -k, --git-hub-token <gitHubToken>       GitHub Token
-  -n, --release-name <releaseName>        Release Name
-  -m, --release-message <releaseMessage>  Release Message
-  -t, --target-tag <targetTag>            Release Tag
-  -p, --prev-tag <prevTag>                Previous Tag (for commit message purposes, only used if release message is not defined)
+  -o, --owner <owner>                     owner (default to .env file)
+  -r, --repo <repo>                       repo (default to .env file)
+  -k, --git-hub-token <gitHubToken>       gitHub token (default to .env file)
+  -n, --release-name <releaseName>        release name (default to tag)
+  -m, --release-message <releaseMessage>  release message
+  -t, --target-tag <targetTag>            release tag
+  -p, --prev-tag <prevTag>                previous tag (for commit message purposes, only used if release message is not defined)
   -b, --is-beta                           Is beta release
-  -c, --should-upload-build-assets        Compress and upload build assets
-  -d, --build-dir <buildDir>              Build dir
-  -l, --cli                               Cli
+  -c, --should-upload-build-assets        compress and upload build assets
+  -d, --build-dir <buildDir>              build dir
+  -l, --cli                               cli
+  -v, --show-token                        show token (shows token in output, defaults to false.)
   -h, --help                              output usage information
 
 # without build assets
@@ -44,7 +45,7 @@ npx @nrfcloud/github-release-util --cli -t "<tag>" -c -d "<build dir>"
 ```
 
 ## Configuration
-This script automatically looks for a `.env` file at the project root. The repo includes a `.env.sample` file. To use with your project, run `cp node_modules/github-release-util/.env.sample ./.env`. The file includes the following config variables:
+This script automatically looks for a `.env` file at the project root. The repo includes a `.env.sample` file. To use with your project, run `cp node_modules/@nrfcloud/github-release-util/.env.sample ./.env`. The file includes the following config variables:
 
 ```
 GITHUB_REPO=
@@ -52,9 +53,9 @@ GITHUB_OWNER=
 GITHUB_TOKEN=
 ```
 
-In interactive mode, you will always be prompted for these, the values from the `.env` file will be set as the defaults if the file exists.
+In interactive mode, you will be prompted for these if the values don't exist in the `.env` file.
 
-In CLI mode, the script will fall back to these defaults if arguments aren't passed in explicitly. 
+In CLI mode, the script will fall back to the values in the `.env` file if not passed in explicitly. 
 
 Get a GitHub token by [following these steps](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line).
 
