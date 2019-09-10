@@ -29,6 +29,7 @@ type Config = {
 	buildDir: string,
 	shouldUploadBuildAssets: boolean,
 	cli: boolean,
+	prevTag?: string,
 };
 
 enum LogType {
@@ -48,6 +49,16 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 
 	console.log(chalk[colors[type]](msg));
 }
+const runCmd = (cmd: string): Promise<string> =>
+	new Promise((resolve, reject) => {
+		require('child_process').exec(cmd, (err, stdout: string) => {
+			if (err) reject(`Command "${cmd}" failed. Error: "${err}"`);
+			resolve(stdout);
+		});
+	});
+
+const getTagBasedMessage = async (prevTag: string, targetTag: string): Promise<string> => 
+	await runCmd(`git log --pretty=format:"%ad - %h - %s" --date=short ${prevTag}..${targetTag}`);
 
 (async () => {
 	let config: Config;
@@ -66,6 +77,7 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 			.option('-n, --release-name <releaseName>', 'Release Name')
 			.option('-m, --release-message <releaseMessage>', 'Release Message')
 			.option('-t, --target-tag <targetTag>', 'Release Tag')
+			.option('-p, --prev-tag <prevTag>', 'Previous Tag (for commit message purposes, only used if release message is not defined)')
 			.option('-b, --is-beta', 'Is beta release')
 			.option('-c, --should-upload-build-assets', 'Compress and upload build assets')
 			.option('-d, --build-dir <buildDir>', 'Build dir')
@@ -79,6 +91,10 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 		if (!config.gitHubToken) config.gitHubToken = process.env.GITHUB_TOKEN || '';
 		if (!config.owner) config.owner = process.env.GITHUB_OWNER || '';
 		if (!config.repo) config.repo = process.env.GITHUB_REPO || '';
+
+		if (!config.releaseMessage && config.prevTag && config.targetTag) {
+			config.releaseMessage = await getTagBasedMessage(config.prevTag, config.targetTag);
+		}
 	}else {
 		 config = await askQuestions();
 	}
@@ -92,6 +108,7 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 
 async function doRelease (config: Config): Promise<void> {
 	const {
+		prevTag,
 		targetTag,
 		gitHubToken,
 		isBeta,
@@ -227,14 +244,6 @@ async function zipFile(dirName: string, tag: string, isBeta: boolean): Promise<F
 }
 
 async function askQuestions(): Promise<Config> {
-	const runCmd = (cmd: string): Promise<string> =>
-		new Promise((resolve, reject) => {
-			require('child_process').exec(cmd, (err, stdout: string) => {
-				if (err) reject(`Command "${cmd}" failed. Error: "${err}"`);
-				resolve(stdout);
-			});
-		})
-
 	const tags = await runCmd(`git tag`);
 	const fiveMostRecentTags = tags 
 		? tags
@@ -321,7 +330,7 @@ async function askQuestions(): Promise<Config> {
 			buildDir
 		}) => {
 			releaseMessage = prevTag && targetTag 
-				? await runCmd(`git log --pretty=format:"%ad - %h - %s" --date=short ${prevTag}..${targetTag}`)
+				? getTagBasedMessage(prevTag, targetTag)
 				: customReleaseMessage;
 
 			return `

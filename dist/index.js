@@ -24,6 +24,14 @@ const log = (msg, type = LogType.log) => {
     };
     console.log(chalk[colors[type]](msg));
 };
+const runCmd = (cmd) => new Promise((resolve, reject) => {
+    require('child_process').exec(cmd, (err, stdout) => {
+        if (err)
+            reject(`Command "${cmd}" failed. Error: "${err}"`);
+        resolve(stdout);
+    });
+});
+const getTagBasedMessage = async (prevTag, targetTag) => await runCmd(`git log --pretty=format:"%ad - %h - %s" --date=short ${prevTag}..${targetTag}`);
 (async () => {
     let config;
     if (process.argv &&
@@ -36,6 +44,7 @@ const log = (msg, type = LogType.log) => {
             .option('-n, --release-name <releaseName>', 'Release Name')
             .option('-m, --release-message <releaseMessage>', 'Release Message')
             .option('-t, --target-tag <targetTag>', 'Release Tag')
+            .option('-p, --prev-tag <prevTag>', 'Previous Tag (for commit message purposes, only used if release message is not defined)')
             .option('-b, --is-beta', 'Is beta release')
             .option('-c, --should-upload-build-assets', 'Compress and upload build assets')
             .option('-d, --build-dir <buildDir>', 'Build dir')
@@ -51,6 +60,9 @@ const log = (msg, type = LogType.log) => {
             config.owner = process.env.GITHUB_OWNER || '';
         if (!config.repo)
             config.repo = process.env.GITHUB_REPO || '';
+        if (!config.releaseMessage && config.prevTag && config.targetTag) {
+            config.releaseMessage = await getTagBasedMessage(config.prevTag, config.targetTag);
+        }
     }
     else {
         config = await askQuestions();
@@ -61,7 +73,7 @@ const log = (msg, type = LogType.log) => {
     doRelease(config);
 })();
 async function doRelease(config) {
-    const { targetTag, gitHubToken, isBeta, releaseMessage, releaseName, owner, repo, buildDir, shouldUploadBuildAssets, cli, } = config;
+    const { prevTag, targetTag, gitHubToken, isBeta, releaseMessage, releaseName, owner, repo, buildDir, shouldUploadBuildAssets, cli, } = config;
     try {
         if (!(gitHubToken && owner && repo && targetTag)) {
             throw new Error(`Token, owner, repo, and tag are required.`);
@@ -165,13 +177,6 @@ async function zipFile(dirName, tag, isBeta) {
     });
 }
 async function askQuestions() {
-    const runCmd = (cmd) => new Promise((resolve, reject) => {
-        require('child_process').exec(cmd, (err, stdout) => {
-            if (err)
-                reject(`Command "${cmd}" failed. Error: "${err}"`);
-            resolve(stdout);
-        });
-    });
     const tags = await runCmd(`git tag`);
     const fiveMostRecentTags = tags
         ? tags
@@ -244,7 +249,7 @@ async function askQuestions() {
             default: false,
             message: async ({ gitHubToken, targetTag, prevTag, releaseName, isBeta, customReleaseMessage, owner, repo, shouldUploadBuildAssets, buildDir }) => {
                 releaseMessage = prevTag && targetTag
-                    ? await runCmd(`git log --pretty=format:"%ad - %h - %s" --date=short ${prevTag}..${targetTag}`)
+                    ? getTagBasedMessage(prevTag, targetTag)
                     : customReleaseMessage;
                 return `
 You are about to create a release on GitHub:

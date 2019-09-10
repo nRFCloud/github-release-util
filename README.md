@@ -26,6 +26,7 @@ Options:
   -n, --release-name <releaseName>        Release Name
   -m, --release-message <releaseMessage>  Release Message
   -t, --target-tag <targetTag>            Release Tag
+  -p, --prev-tag <prevTag>                Previous Tag (for commit message purposes, only used if release message is not defined)
   -b, --is-beta                           Is beta release
   -c, --should-upload-build-assets        Compress and upload build assets
   -d, --build-dir <buildDir>              Build dir
