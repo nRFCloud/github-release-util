@@ -123,6 +123,8 @@ async function doRelease (config: Config): Promise<void> {
 		cli,
 	} = config;
 
+	let exitCode = 0;
+
 	try {
 		if (!(gitHubToken && owner && repo && targetTag)) {
 			throw new Error(`Token, owner, repo, and tag are required.`);
@@ -187,10 +189,11 @@ async function doRelease (config: Config): Promise<void> {
 			}
 		}
 	} catch (err) {
+		exitCode = 1;
 		log(`Error with release: "${err}"`, LogType.error);
 	} finally {
 		log('\n\n');
-		process.exit();
+		process.exit(exitCode);
 	}
 }
 
