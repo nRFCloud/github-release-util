@@ -75,6 +75,7 @@ const getTagBasedMessage = async (prevTag, targetTag) => await runCmd(`git log -
 })();
 async function doRelease(config) {
     const { prevTag, targetTag, gitHubToken, isBeta, releaseMessage, releaseName, owner, repo, buildDir, shouldUploadBuildAssets, cli, } = config;
+    let exitCode = 0;
     try {
         if (!(gitHubToken && owner && repo && targetTag)) {
             throw new Error(`Token, owner, repo, and tag are required.`);
@@ -129,11 +130,12 @@ async function doRelease(config) {
         }
     }
     catch (err) {
+        exitCode = 1;
         log(`Error with release: "${err}"`, LogType.error);
     }
     finally {
         log('\n\n');
-        process.exit();
+        process.exit(exitCode);
     }
 }
 async function zipFile(dirName, tag, isBeta) {
