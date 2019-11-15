@@ -31,6 +31,7 @@ type Config = {
 	releaseMessage?: string,
 	prevTag?: string,
 	showToken?: boolean,
+	branch?: string,
 };
 
 enum LogType {
@@ -50,6 +51,7 @@ const log = (msg: any, type: LogType = LogType.log): void => {
 
 	console.log(chalk[colors[type]](msg));
 }
+
 const runCmd = (cmd: string): Promise<string> =>
 	new Promise((resolve, reject) => {
 		require('child_process').exec(cmd, (err, stdout: string) => {
@@ -60,6 +62,8 @@ const runCmd = (cmd: string): Promise<string> =>
 
 const getTagBasedMessage = async (prevTag: string, targetTag: string): Promise<string> => 
 	await runCmd(`git log --pretty=format:"%ad - %h - %s" --date=short ${prevTag}..${targetTag}`);
+
+const defaultBranch = 'master';
 
 (async () => {
 	let config: Config;
@@ -84,6 +88,7 @@ const getTagBasedMessage = async (prevTag: string, targetTag: string): Promise<s
 			.option('-d, --build-dir <buildDir>', 'build dir')
 			.option('-l, --cli', 'cli')
 			.option('-v, --show-token', 'show token (shows token in output, defaults to false.)')
+			.option('-a, --branch', `target branch (defaults to "${defaultBranch}")`)
 			.parse(process.argv);
 
 		config = program.opts();
@@ -93,6 +98,7 @@ const getTagBasedMessage = async (prevTag: string, targetTag: string): Promise<s
 		if (!config.gitHubToken) config.gitHubToken = process.env.GITHUB_TOKEN || '';
 		if (!config.owner) config.owner = process.env.GITHUB_OWNER || '';
 		if (!config.repo) config.repo = process.env.GITHUB_REPO || '';
+		if (!config.branch) config.branch = defaultBranch;
 
 		if (!config.releaseMessage && config.prevTag && config.targetTag) {
 			config.releaseMessage = await getTagBasedMessage(config.prevTag, config.targetTag);
@@ -154,6 +160,7 @@ async function doRelease (config: Config): Promise<void> {
 				body: releaseMessage,
 				tag_name: targetTag,
 				prerelease: isBeta,
+				target_commitish: 'master'
 			});
 		log('DONE!', LogType.info);
 
@@ -274,6 +281,11 @@ async function askQuestions(): Promise<Config> {
 		type: 'confirm',
 		default: false,
 	}, {
+		name: 'branch',
+		message: 'Branch name',
+		type: 'input',
+		default: defaultBranch,
+	}, {
 		name: 'targetTag',
 		message: 'Which tag is this release for? (choose one)',
 		type: 'list',
@@ -337,6 +349,7 @@ async function askQuestions(): Promise<Config> {
 				prevTag,
 				releaseName,
 				isBeta,
+				branch,
 				customReleaseMessage,
 				owner,
 				repo,
@@ -357,7 +370,8 @@ async function askQuestions(): Promise<Config> {
 You are about to create a release on GitHub:
 
 Tag: ${targetTag}
-Prerelease: ${isBeta ? 'Yes' : 'No'}
+Prerelease/Is Beta: ${isBeta ? 'Yes' : 'No'}
+Branch: ${branch}
 Release Name: ${releaseName}
 Release Message:
 ${releaseMessage}
