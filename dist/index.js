@@ -32,6 +32,7 @@ const runCmd = (cmd) => new Promise((resolve, reject) => {
     });
 });
 const getTagBasedMessage = async (prevTag, targetTag) => await runCmd(`git log --pretty=format:"%ad - %h - %s" --date=short ${prevTag}..${targetTag}`);
+const defaultBranch = 'master';
 (async () => {
     let config;
     if (process.argv &&
@@ -50,6 +51,7 @@ const getTagBasedMessage = async (prevTag, targetTag) => await runCmd(`git log -
             .option('-d, --build-dir <buildDir>', 'build dir')
             .option('-l, --cli', 'cli')
             .option('-v, --show-token', 'show token (shows token in output, defaults to false.)')
+            .option('-a, --branch', `target branch (defaults to "${defaultBranch}")`)
             .parse(process.argv);
         config = program.opts();
         config.confirmed = true;
@@ -61,6 +63,8 @@ const getTagBasedMessage = async (prevTag, targetTag) => await runCmd(`git log -
             config.owner = process.env.GITHUB_OWNER || '';
         if (!config.repo)
             config.repo = process.env.GITHUB_REPO || '';
+        if (!config.branch)
+            config.branch = defaultBranch;
         if (!config.releaseMessage && config.prevTag && config.targetTag) {
             config.releaseMessage = await getTagBasedMessage(config.prevTag, config.targetTag);
         }
@@ -99,6 +103,7 @@ async function doRelease(config) {
             body: releaseMessage,
             tag_name: targetTag,
             prerelease: isBeta,
+            target_commitish: 'master'
         });
         log('DONE!', LogType.info);
         if (shouldUploadBuildAssets) {
@@ -202,6 +207,11 @@ async function askQuestions() {
             type: 'confirm',
             default: false,
         }, {
+            name: 'branch',
+            message: 'Branch name',
+            type: 'input',
+            default: defaultBranch,
+        }, {
             name: 'targetTag',
             message: 'Which tag is this release for? (choose one)',
             type: 'list',
@@ -259,7 +269,7 @@ async function askQuestions() {
             type: 'confirm',
             default: false,
             message: async (answers) => {
-                const { gitHubToken, targetTag, prevTag, releaseName, isBeta, customReleaseMessage, owner, repo, shouldUploadBuildAssets, buildDir, showToken, } = answers;
+                const { gitHubToken, targetTag, prevTag, releaseName, isBeta, branch, customReleaseMessage, owner, repo, shouldUploadBuildAssets, buildDir, showToken, } = answers;
                 releaseMessage = prevTag && targetTag
                     ? await getTagBasedMessage(prevTag, targetTag)
                     : customReleaseMessage;
@@ -273,7 +283,8 @@ async function askQuestions() {
 You are about to create a release on GitHub:
 
 Tag: ${targetTag}
-Prerelease: ${isBeta ? 'Yes' : 'No'}
+Prerelease/Is Beta: ${isBeta ? 'Yes' : 'No'}
+Branch: ${branch}
 Release Name: ${releaseName}
 Release Message:
 ${releaseMessage}
