@@ -100,8 +100,21 @@ const defaultBranch = 'master';
 		if (!config.repo) config.repo = process.env.GITHUB_REPO || '';
 		if (!config.branch) config.branch = defaultBranch;
 
-		if (!config.releaseMessage && config.prevTag && config.targetTag) {
-			config.releaseMessage = await getTagBasedMessage(config.prevTag, config.targetTag);
+		if (!config.releaseMessage) {
+			const autoMessage = await getTagBasedMessage(config.prevTag || 'master', config.targetTag);
+			config.releaseMessage = `
+Changelog: [${config.prevTag || 'master'}...${config.targetTag}](https://github.com/${config.owner}/${config.repo}/compare/${config.prevTag || 'master'}...${config.targetTag})
+
+## MAJOR FEATURES
+* ${autoMessage}
+
+## ENHANCEMENTS
+* < TBD >
+* < TBD >
+
+## BREAKING CHANGES
+* < TBD >
+`;
 		}
 	}else {
 		 config = await askQuestions();

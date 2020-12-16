@@ -8,13 +8,13 @@ To use with your project install (`npm i -D @nrfcloud/github-release-util`) and 
 ```
 {
     "scripts": {
-        "release": "gru"
+        "release": "github-release-util"
     }
 }
 ```
 
 ### CLI mode
-By default this script walks the user through the decisions to create a release. It also has an option to send in all the options at once (no prompt). The following is an example of the available options. You can get this output by running `npx gru --cli --help`.
+By default this script walks the user through the decisions to create a release. It also has an option to send in all the options at once (no prompt). The following is an example of the available options. You can get this output by running `npx github-release-util --cli --help`.
 
 ```
 Usage: index.ts [options]
@@ -35,10 +35,10 @@ Options:
   -h, --help                              output usage information
 
 # without build assets
-npx gru --cli -t "<tag>"
+npx github-release-util --cli -t "<tag>"
 
 # with build assets
-npx gru --cli -t "<tag>" -c -d "<build dir>"
+npx github-release-util --cli -t "<tag>" -c -d "<build dir>"
 
 # this can also be called without the alias by using the following:
 npx @nrfcloud/github-release-util --cli -t "<tag>" -c -d "<build dir>"

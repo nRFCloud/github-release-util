@@ -3,13 +3,15 @@
   "version": "2.5.1",
   "description": "Automates creating a github releases and uploading build assets.",
   "bin": {
-    "gru": "dist/index.js"
+    "gru": "dist/index.js",
+    "github-release-util": "dist/index.js"
   },
   "scripts": {
     "build": "./node_modules/.bin/tsc -p ./tsconfig.json",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
+    "github-release-util",
     "github",
     "release",
     "cli"
