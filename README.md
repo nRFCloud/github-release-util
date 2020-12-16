@@ -61,3 +61,4 @@ Get a GitHub token by [following these steps](https://help.github.com/en/article
 
 ## Gotchas
 The release must be linked to a tag. And the tag for which you're deploying must have been created before you run this script.
+
