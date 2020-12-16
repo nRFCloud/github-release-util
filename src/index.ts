@@ -1,67 +1,18 @@
 #!/usr/bin/env node
 require('dotenv').config();
 
-const fs = require('fs');
-const path = require('path');
-const chalk = require('chalk');
-const mime = require('mime-types');
-const archiver = require('archiver');
 const inquirer = require('inquirer');
-const Octokit = require('@octokit/rest');
 const program = require('commander');
 
-type FileDetails = {
-	name: string;
-	fullPath: string;
-	headers: {'Content-Type': string, 'Content-Length': number};
-	buffer: any;
-};
+import { doRelease, Config } from './release';
 
-type Config = {
-	targetTag: string,
-	gitHubToken: string,
-	owner: string,
-	repo: string,
-	buildDir: string,
-	cli: boolean,
-	confirmed: boolean,
-	isBeta?: boolean,
-	releaseName?: string,
-	shouldUploadBuildAssets?: boolean,
-	releaseMessage?: string,
-	prevTag?: string,
-	showToken?: boolean,
-	branch?: string,
-};
-
-enum LogType {
-	info,
+import {
 	log,
-	error,
-	debug,
-}
-
-const log = (msg: any, type: LogType = LogType.log): void => {
-	const colors = {
-		[LogType.info]: 'gray',
-		[LogType.log]: 'cyan',
-		[LogType.error]: 'red',
-		[LogType.debug]: 'yellow',
-	};
-
-	console.log(chalk[colors[type]](msg));
-}
-
-const runCmd = (cmd: string): Promise<string> =>
-	new Promise((resolve, reject) => {
-		require('child_process').exec(cmd, (err, stdout: string) => {
-			if (err) reject(`Command "${cmd}" failed. Error: "${err}"`);
-			resolve(stdout);
-		});
-	});
-
-const getTagBasedMessage = async (prevTag: string, targetTag: string): Promise<string> => 
-	await runCmd(`git log --pretty=format:"%ad - %h - %s" --date=short ${prevTag}..${targetTag}`);
+	runCmd,
+	LogType,
+	getTagBasedMessage,
+	generatePrettyReleaseMessage,
+} from './utils';
 
 const defaultBranch = 'master';
 
@@ -101,20 +52,14 @@ const defaultBranch = 'master';
 		if (!config.branch) config.branch = defaultBranch;
 
 		if (!config.releaseMessage) {
-			const autoMessage = await getTagBasedMessage(config.prevTag || 'master', config.targetTag);
-			config.releaseMessage = `
-Changelog: [${config.prevTag || 'master'}...${config.targetTag}](https://github.com/${config.owner}/${config.repo}/compare/${config.prevTag || 'master'}...${config.targetTag})
-
-## MAJOR FEATURES
-* ${autoMessage}
-
-## ENHANCEMENTS
-* < TBD >
-* < TBD >
-
-## BREAKING CHANGES
-* < TBD >
-`;
+			const commits = await getTagBasedMessage(config.prevTag || 'master', config.targetTag);
+			const repoUrl = `https://github.com/${config.owner}/${config.repo}`;
+			config.releaseMessage = generatePrettyReleaseMessage(
+				commits,
+				repoUrl,
+				config.targetTag,
+				config.prevTag
+			);
 		}
 	}else {
 		 config = await askQuestions();
@@ -126,150 +71,6 @@ Changelog: [${config.prevTag || 'master'}...${config.targetTag}](https://github.
 
 	doRelease(config);
 })();
-
-async function doRelease (config: Config): Promise<void> {
-	const {
-		prevTag,
-		targetTag,
-		gitHubToken,
-		isBeta,
-		releaseMessage,
-		releaseName,
-		owner,
-		repo,
-		buildDir,
-		shouldUploadBuildAssets,
-		cli,
-	} = config;
-
-	let exitCode = 0;
-
-	try {
-		if (!(gitHubToken && owner && repo && targetTag)) {
-			throw new Error(`Token, owner, repo, and tag are required.`);
-		}
-
-		const client = new Octokit({
-			auth: gitHubToken,
-		});
-
-		log(`\n\nConfig:`)
-		log(
-			Object
-				.keys(config)
-				.map(key => {
-					const val: string = key === 'gitHubToken' && config.showToken !== true ? '<secret>' : config[key];
-					return `${key}: ${val}`
-				})
-				.join('\n'),
-			LogType.info
-		);
-
-		log(`\n\nCreating release...`);
-		const release = await client.repos.createRelease({
-				owner,
-				repo,
-				name: releaseName,
-				body: releaseMessage,
-				tag_name: targetTag,
-				prerelease: isBeta,
-				target_commitish: 'master'
-			});
-		log('DONE!', LogType.info);
-
-		if (shouldUploadBuildAssets) {
-			log(`\n\nZipping...`);
-			const file: FileDetails = await zipFile(buildDir, targetTag, isBeta);
-			log('DONE!', LogType.info);
-
-			log('\n\nUploading...');
-			await client.repos.uploadReleaseAsset({
-				url: release.data.upload_url,
-				headers: file.headers,
-				file: file.buffer,
-				name: file.name,
-			});
-			log(`DONE!`, LogType.info);
-
-			const { doDelete } = cli === false 
-				? await inquirer.prompt([{
-					name: 'doDelete',
-					message: `Delete build assets "${file.name}"?`,
-					default: true,
-					type: 'confirm',
-				}])
-				: { doDelete: true};
-			
-			if (doDelete === true) {
-				const fileToDelete = `${process.cwd()}${path.sep}${file.name}`;
-
-				log('\n\nDeleting...');
-				fs.unlinkSync(fileToDelete);
-				log('DONE!', LogType.info);
-			}
-		}
-	} catch (err) {
-		exitCode = 1;
-		log(`Error with release: "${err}"`, LogType.error);
-	} finally {
-		log('\n\n');
-		process.exit(exitCode);
-	}
-}
-
-async function zipFile(dirName: string, tag: string, isBeta: boolean): Promise<FileDetails> {
-	const filename = `${tag}_${isBeta ? 'beta' : 'prod'}_build-assets.zip`;
-	const cwd = `${process.cwd()}${path.sep}`;
-	const buildDir = `${cwd}${dirName}`;
-	const dirNotFoundError = `Build directory "${buildDir}" not found.`;
-	let dirStats;
-
-	try {
-		dirStats = fs.statSync(buildDir);
-	} catch (err) {
-		throw new Error(dirNotFoundError);
-	}
-
-	if (!dirStats.isDirectory()) {
-		throw new Error(dirNotFoundError);
-	}
-
-	return new Promise<FileDetails>((resolve, reject) => {
-		const archive = archiver('zip');
-		const output = fs.createWriteStream(`${cwd}${filename}`);
-
-		output.on('close', () => {
-			const fullPath = path.resolve(`.${path.sep}`, filename);
-			const stats = fs.statSync(fullPath);
-
-			if (!stats.isFile()) {
-				reject(`Could not find file "${fullPath}"`);
-			}
-
-			const headers = {
-				'Content-Type': mime.lookup(fullPath),
-				'Content-Length': stats.size,
-			};
-
-			const buffer = fs.readFileSync(fullPath);
-
-			resolve({
-				name: filename,
-				fullPath,
-				headers,
-				buffer,
-			} as FileDetails);
-		});
-
-		archive.on('error', err => {
-			reject(err);
-		});
-
-		archive.pipe(output);
-		archive.glob(`${dirName}/**/*`);
-		archive.finalize();
-	});
-}
 
 async function askQuestions(): Promise<Config> {
 	const tags = await runCmd(`git tag`);
