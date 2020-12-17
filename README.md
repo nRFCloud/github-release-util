@@ -1,6 +1,16 @@
 # @nrfcloud/github-release-util
 Utility script to automate gitHub release workflow and uploading of build assets (optional). 
 
+- [Usage](#usage)
+  - [Interactive Mode](#interactive-mode)
+  - [CLI mode](#cli-mode)
+- [Configuration](#configuration)
+- [Contributing](#contributing)
+  - [Development workflow](#development-workflow)
+  - [Testing](#testing)
+  - [Submitting a PR (or issue)](#submitting-a-pr-or-issue)
+- [Gotchas](#gotchas)
+
 ## Usage
 
 ### Interactive Mode
@@ -58,6 +68,35 @@ In interactive mode, you will be prompted for these if the values don't exist in
 In CLI mode, the script will fall back to the values in the `.env` file if not passed in explicitly. 
 
 Get a GitHub token by [following these steps](https://help.github.com/en/articles/creating-a-personal-access-token-for-the-command-line).
+
+## Contributing
+
+### Development workflow
+```bash
+# make changes to your files and commit
+git commit -am "<feat|fix|refactor|deps|style|chore>: <commit message>"
+
+# run tests
+npm run test
+
+# build
+npm run build
+
+# test interactive mode
+node ./dist/index.js
+
+# test cli mode
+node dist/index.js --cli --owner <repo owner> --repo <repo name> --build-dir <build dir> --target-tag <new tag> --prev-tag <prev tag> [--should-upload-build-assets]
+```
+### Testing
+Tests are done with `ts-jest` and contained in the `test` dir.
+```bash
+npm run test
+```
+
+### Submitting a PR (or issue)
+
+Submit a PR or an issue [via github](https://github.com/nRFCloud/github-release-util)
 
 ## Gotchas
 The release must be linked to a tag. And the tag for which you're deploying must have been created before you run this script.
