@@ -8,6 +8,8 @@
   },
   "scripts": {
     "build": "./node_modules/.bin/tsc --build",
+    "deploy": "yarn build && yarn publish",
+    "deploy:beta": "yarn build && yarn publish --tag beta",
     "test": "jest"
   },
   "keywords": [
