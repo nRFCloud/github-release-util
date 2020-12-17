@@ -54,7 +54,7 @@ export async function zipFile(dirName: string, tag: string, isBeta: boolean): Pr
 			} as FileDetails);
 		});
 
-		archive.on('error', err => {
+		archive.on('error', (err: Error) => {
 			reject(err);
 		});
 

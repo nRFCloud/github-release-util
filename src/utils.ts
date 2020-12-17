@@ -9,7 +9,7 @@ export enum LogType {
 
 export const runCmd = (cmd: string): Promise<string> =>
 new Promise((resolve, reject) => {
-  require('child_process').exec(cmd, (err, stdout: string) => {
+  require('child_process').exec(cmd, (err: Error, stdout: string) => {
     if (err) reject(`Command "${cmd}" failed. Error: "${err}"`);
     resolve(stdout);
   });
@@ -35,10 +35,10 @@ export const generatePrettyReleaseMessage = (
 	targetTag: string,
 	prevTag: string = 'origin/master',
 ): string => {
-	const breakingChanges = []
-	const features = [];
-	const bugs = [];
-	const other = [];
+	const breakingChanges: string[] = []
+	const features: string[] = [];
+	const bugs: string[] = [];
+	const other: string[] = [];
 	const lines = commits.split('\n');
 
 	lines.forEach(line => { 

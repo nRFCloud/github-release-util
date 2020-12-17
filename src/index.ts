@@ -4,7 +4,6 @@ require('dotenv').config();
 const inquirer = require('inquirer');
 const program = require('commander');
 
-import { doRelease, Config } from './release';
 
 import {
 	log,
@@ -13,6 +12,8 @@ import {
 	getTagBasedMessage,
 	generatePrettyReleaseMessage,
 } from './utils';
+
+import { doRelease, Config } from './release';
 
 const defaultBranch = 'master';
 
@@ -109,18 +110,18 @@ async function askQuestions(): Promise<Config> {
 		name: 'prevTag',
 		message: 'What is the previous tag? (choose one)',
 		type: 'list',
-		choices: answers => fiveMostRecentTags && fiveMostRecentTags.filter(tag => tag !== answers.targetTag),
+		choices: (answers: Partial<Config>) => fiveMostRecentTags && fiveMostRecentTags.filter(tag => tag !== answers.targetTag),
 		when: (): boolean => !!fiveMostRecentTags,
 	}, {
 		name: 'releaseName',
 		message: 'Release name',
 		type: 'input',
-		default: ({ targetTag }) => targetTag,
+		default: ({ targetTag }: Partial<Config>) => targetTag,
 	}, {
 		name: 'customReleaseMessage',
 		message: 'Release message',
 		type: 'input',
-		when: ({prevTag, targetTag}) => !targetTag || !prevTag,
+		when: ({prevTag, targetTag}: Partial<Config>) => !targetTag || !prevTag,
 	}, {
 		name: 'shouldUploadBuildAssets',
 		message: 'Compress and upload build assets?',
@@ -131,7 +132,7 @@ async function askQuestions(): Promise<Config> {
 		message: 'Assets directory',
 		type: 'input',
 		default: 'cdn',
-		when: ({shouldUploadBuildAssets}) => !!shouldUploadBuildAssets,
+		when: ({shouldUploadBuildAssets}: Partial<Config>) => !!shouldUploadBuildAssets,
 	},{
 		name: 'showToken',
 		message: 'Show sensitive details in output?',
@@ -156,7 +157,7 @@ async function askQuestions(): Promise<Config> {
 		name: 'confirmed',
 		type: 'confirm',
 		default: false,
-		message: async answers => {
+		message: async (answers: Partial<Config>) => {
 			const {
 				gitHubToken,
 				targetTag,

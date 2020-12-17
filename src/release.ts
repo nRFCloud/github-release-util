@@ -21,9 +21,10 @@ export type Config = {
 	prevTag?: string,
 	showToken?: boolean,
 	branch?: string,
+	[key: string]: any,
 };
 
-export async function doRelease (config: Config): Promise<void> {
+export const doRelease = async (config: Config): Promise<void> => {
 	const {
 		prevTag,
 		targetTag,
@@ -75,7 +76,7 @@ export async function doRelease (config: Config): Promise<void> {
 
 		if (shouldUploadBuildAssets) {
 			log(`\n\nZipping...`);
-			const file: FileDetails = await zipFile(buildDir, targetTag, isBeta);
+			const file: FileDetails = await zipFile(buildDir, targetTag, isBeta!);
 			log('DONE!', LogType.info);
 
 			log('\n\nUploading...');
